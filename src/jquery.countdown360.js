@@ -11,9 +11,12 @@
       fontWeight: 700,                 // the font weight
       autostart: true,                 // start the countdown automatically
       seconds: 10,                     // the number of seconds to count down
+      remainingSeconds: undefined,     // optional number of seconds to skip ahead on start, if omitted timer will start at the value of 'seconds'                 
+      timeformat: 'SS',                // the time format, use "MMSS" for MM:SS format (e.g.: 07:21)
       label: ["second", "seconds"],    // the label to use or false if none
       startOverAfterAdding: true,      // Start the timer over after time is added with addSeconds
       smooth: false,                   // should the timer be smooth or stepping
+      clockwise: false,                // clockwise removal of stroke               
       onComplete: function () {}
     };
 
@@ -58,8 +61,16 @@
 
     start: function () {
       this.startedAt = new Date();
-      this._drawCountdownShape(Math.PI*3.5, true);
-      this._drawCountdownLabel(0);
+
+      this._drawCountdownShape(Math.PI*3.5, false); // abc - here it draws the intial shape
+
+      var millisAlreadyElapsed = this._getMillisElapsed();
+      var secondsAlreadyElapsed = Math.floor((millisAlreadyElapsed)/1000);
+
+
+      this._drawCountdownShape(this._getEndAngle(millisAlreadyElapsed), this.settings.clockwise);
+      
+      this._drawCountdownLabel(secondsAlreadyElapsed);
       var timerInterval = 1000;
       if (this.settings.smooth) {
         timerInterval = 16;
@@ -124,12 +135,27 @@
       this.pen.fillStyle = this.settings.fillStyle;
       this.pen.fillText(secondsLeft + 1, x, y);
       this.pen.fillStyle  = this.settings.fontColor;
-      this.pen.fillText(secondsLeft, x, y);
+      this.pen.fillText(this._timeFormat(secondsLeft, this.settings.timeformat), x, y);
       if (drawLabel) {
         this.pen.font = "normal small-caps " + (this.settings.fontSize/3) + "px " + this.settings.fontFamily;
         this.pen.fillText(label, this.settings.width/2, this.settings.height/2 + (this.settings.fontSize/2.2));
       }
     },
+    
+    _timeFormat: function (secondsLeft, format) {
+      switch(format) {
+      case "MMSS":
+        var minutes = Math.floor(secondsLeft / 60);
+        var seconds = secondsLeft - (minutes * 60);
+        if (minutes < 10) {minutes = "0"+minutes;}
+        if (seconds < 10) {seconds = "0"+seconds;}
+        return minutes+':'+seconds;
+      case "SS":
+        return secondsLeft;
+      default:
+        return secondsLeft;     
+      }
+    },    
 
     _drawCountdownShape: function (endAngle, drawStroke) {
       this.pen.fillStyle = this.settings.fillStyle;
@@ -141,20 +167,42 @@
 
     _draw: function () {
       var millisElapsed, secondsElapsed;
-      millisElapsed = new Date().getTime() - this.startedAt.getTime();
+      
+      millisElapsed = this._getMillisElapsed();
       secondsElapsed = Math.floor((millisElapsed)/1000);
-        endAngle = (Math.PI*3.5) - (((Math.PI*2)/(this.settings.seconds * 1000)) * millisElapsed);
+      endAngle = this._getEndAngle(millisElapsed);
+      
       this._clearRect();
-      this._drawCountdownShape(Math.PI*3.5, false);
+      
       if (secondsElapsed < this.settings.seconds) {
+        this._drawCountdownShape(Math.PI*3.5, false);
         this._drawCountdownShape(endAngle, true);
         this._drawCountdownLabel(secondsElapsed);
       } else {
+        this._drawCountdownShape(Math.PI*3.5, this.settings.clockwise);
         this._drawCountdownLabel(this.settings.seconds);
         this.stop();
         this.settings.onComplete();
       }
-    }
+    },
+    
+    
+    _getMillisElapsed: function(){
+      if (this.settings.remainingSeconds == null){
+        return (new Date().getTime() - this.startedAt.getTime());
+      } else {
+        return (new Date().getTime() - this.startedAt.getTime() + 1000 * (this.settings.seconds - this.settings.remainingSeconds));
+      }
+     
+    },
+    
+    _getEndAngle: function(millisElapsed){
+      if (this.settings.clockwise){
+        return (((Math.PI * 2) / (this.settings.seconds * 1000)) * millisElapsed) - (Math.PI * .5);
+      } else {
+        return ((Math.PI*3.5) - (((Math.PI*2)/(this.settings.seconds * 1000)) * millisElapsed));  
+      }
+    }    
 
   };
 
